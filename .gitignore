@@ -1,0 +1,7 @@
+__pycache__/
+*.py[oc]
+.venv/
+.env
+secrets/
+# personal data: CV, profile, application log, agent memory
+data/

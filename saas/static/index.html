@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auto Job — apply on Naukri while you sleep</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <!-- Auth -->
+  <section id="auth" class="auth hidden">
+    <div class="auth-card">
+      <div class="brand"><span class="logo">AJ</span> Auto Job</div>
+      <p class="muted">Upload your resume once. We keep your Naukri profile fresh every day and apply to jobs that fit.</p>
+      <div class="tabs">
+        <button class="tab active" data-auth="login">Sign in</button>
+        <button class="tab" data-auth="signup">Create account</button>
+      </div>
+      <form id="auth-form">
+        <label class="signup-only hidden">Name<input name="name" autocomplete="name"></label>
+        <label>Email<input name="email" type="email" required autocomplete="email"></label>
+        <label>Password<input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+        <p id="auth-error" class="error" role="alert"></p>
+        <button class="btn primary wide" type="submit" id="auth-submit">Sign in</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- App -->
+  <section id="app" class="hidden">
+    <header class="topbar">
+      <div class="brand"><span class="logo">AJ</span> Auto Job</div>
+      <nav>
+        <button class="nav active" data-view="overview">Overview</button>
+        <button class="nav" data-view="skill">Resume &amp; skill</button>
+        <button class="nav" data-view="naukri">Naukri</button>
+        <button class="nav" data-view="applications">Applications</button>
+        <button class="nav" data-view="questions">Questions <span id="q-badge" class="badge hidden"></span></button>
+      </nav>
+      <div class="user"><span id="user-name"></span><button class="btn ghost" id="logout">Sign out</button></div>
+    </header>
+
+    <main>
+      <!-- Overview -->
+      <div class="view" id="view-overview">
+        <div id="setup" class="card setup hidden">
+          <h2>Get set up</h2>
+          <ol class="steps">
+            <li id="step-resume"><b>Upload your resume</b> — we turn it into your apply skill.</li>
+            <li id="step-naukri"><b>Connect Naukri</b> — so we can update your profile and apply.</li>
+            <li id="step-auto"><b>Turn on auto-apply</b> — every day: profile refresh, then applications.</li>
+          </ol>
+        </div>
+
+        <div class="grid stats">
+          <div class="card stat"><span class="label">Applied today</span><span class="value" id="s-today">0</span><span class="sub" id="s-limit"></span></div>
+          <div class="card stat"><span class="label">Applied total</span><span class="value" id="s-total">0</span></div>
+          <div class="card stat"><span class="label">Skipped (low match)</span><span class="value" id="s-skipped">0</span></div>
+          <div class="card stat"><span class="label">Profile refreshed</span><span class="value small" id="s-refresh">—</span><span class="sub" id="s-refresh-note"></span></div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <div class="row between">
+              <h2>Auto-apply</h2>
+              <label class="switch"><input type="checkbox" id="auto-apply"><span></span></label>
+            </div>
+            <p class="muted" id="auto-desc">Off. Turn it on and every day from the start hour we refresh your Naukri profile, then apply to matching jobs up to your daily limit.</p>
+            <div class="form-grid">
+              <label>Daily limit<input type="number" id="set-limit" min="1" max="50"></label>
+              <label>Minimum match %<input type="number" id="set-match" min="0" max="100"></label>
+              <label>Start hour (0-23)<input type="number" id="set-hour" min="0" max="23"></label>
+              <label class="check"><input type="checkbox" id="set-refresh"> Daily profile refresh</label>
+              <label class="full">Search keywords <span class="muted">(empty = from your skill)</span><input id="set-keywords" placeholder="e.g. python developer, ml engineer"></label>
+              <label class="full">Locations <span class="muted">(empty = main cities + all India)</span><input id="set-locations" placeholder="e.g. Bengaluru, Pune, Remote"></label>
+            </div>
+            <div class="row"><button class="btn" id="save-settings">Save settings</button><span class="saved" id="settings-saved"></span></div>
+          </div>
+
+          <div class="card">
+            <div class="row between"><h2>Run now</h2><span id="run-status" class="pill"></span></div>
+            <div class="row wrap">
+              <button class="btn primary" data-run="apply">Apply now</button>
+              <button class="btn" data-run="dry_run">Dry run (no submit)</button>
+              <button class="btn" data-run="profile_refresh">Refresh profile</button>
+              <button class="btn danger hidden" id="stop-run">Stop</button>
+            </div>
+            <p class="error" id="run-error"></p>
+            <pre class="log" id="run-log">No runs yet.</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resume & skill -->
+      <div class="view hidden" id="view-skill">
+        <div class="card">
+          <div class="row between">
+            <h2>Resume</h2>
+            <span class="pill" id="resume-status"></span>
+          </div>
+          <div class="drop" id="drop">
+            <input type="file" id="resume-file" accept=".pdf,.docx" hidden>
+            <p><b id="resume-name">Drop your resume here</b></p>
+            <p class="muted">PDF or DOCX, up to 8 MB. Uploading a new one rebuilds your skill.</p>
+            <button class="btn" id="pick-file">Choose file</button>
+          </div>
+          <p class="error" id="resume-error"></p>
+        </div>
+
+        <div class="card" id="skill-card">
+          <div class="row between">
+            <h2>Your apply skill</h2>
+            <div class="row"><button class="btn ghost" id="rebuild-skill">Rebuild from resume</button><button class="btn primary" id="save-skill">Save skill</button></div>
+          </div>
+          <p class="muted">Built from your resume. The bot searches with these keywords, matches jobs on these skills and avoids titles with the avoid words. Edit anything — one item per line.</p>
+          <div class="form-grid">
+            <label class="full">Naukri headline<input id="sk-headline" maxlength="250"></label>
+            <label>Search keywords<textarea id="sk-search_keywords" rows="5"></textarea></label>
+            <label>Target job titles<textarea id="sk-target_titles" rows="5"></textarea></label>
+            <label>Core skills<textarea id="sk-core_skills" rows="6"></textarea></label>
+            <label>Secondary skills<textarea id="sk-secondary_skills" rows="6"></textarea></label>
+            <label>Avoid jobs with these title words<textarea id="sk-avoid_keywords" rows="4"></textarea></label>
+            <label>Preferred locations<textarea id="sk-preferred_locations" rows="4"></textarea></label>
+            <label>Total experience (years)<input id="sk-experience_years" type="number" step="0.5" min="0"></label>
+            <label>Seniority<input id="sk-seniority"></label>
+            <label>Notice period<input id="sk-notice_period"></label>
+            <label>Current CTC<input id="sk-current_ctc"></label>
+            <label>Expected CTC<input id="sk-expected_ctc"></label>
+            <label>Willing to relocate<input id="sk-willing_to_relocate"></label>
+          </div>
+          <span class="saved" id="skill-saved"></span>
+        </div>
+      </div>
+
+      <!-- Naukri -->
+      <div class="view hidden" id="view-naukri">
+        <div class="card narrow">
+          <div class="row between"><h2>Naukri account</h2><span class="pill" id="naukri-status"></span></div>
+          <p class="muted" id="naukri-msg"></p>
+          <form id="naukri-form" class="form-grid">
+            <label class="full">Naukri email or mobile<input id="nk-email" required></label>
+            <label class="full">Naukri password <span class="muted" id="nk-pass-hint"></span><input id="nk-password" type="password" autocomplete="new-password"></label>
+            <div class="row full">
+              <button class="btn primary" type="submit">Save &amp; connect</button>
+              <button class="btn" type="button" id="browser-login">Sign in with a browser window</button>
+              <button class="btn" type="button" id="naukri-check">Check connection</button>
+              <button class="btn ghost danger-text" type="button" id="naukri-disconnect">Disconnect</button>
+            </div>
+          </form>
+          <p class="error" id="naukri-error"></p>
+          <p class="muted small">Your password is encrypted at rest and only used to sign in to Naukri for you. If Naukri asks for an OTP or CAPTCHA, use “Sign in with a browser window” once — the session is then kept.</p>
+        </div>
+      </div>
+
+      <!-- Applications -->
+      <div class="view hidden" id="view-applications">
+        <div class="card">
+          <div class="row between">
+            <h2>Applications</h2>
+            <select id="app-filter">
+              <option value="">All</option><option value="applied">Applied</option><option value="skipped">Skipped</option>
+              <option value="external">Company site</option><option value="needs_user">Needs you</option>
+              <option value="error">Errors</option><option value="dry_run">Dry run</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>When</th><th>Job</th><th>Company</th><th>Match</th><th>Status</th><th>Note</th></tr></thead>
+            <tbody id="app-rows"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Questions -->
+      <div class="view hidden" id="view-questions">
+        <div class="card">
+          <h2>Screening questions</h2>
+          <p class="muted">Questions employers asked that your resume doesn't answer. Answer once — every later application reuses it.</p>
+          <div id="q-list"></div>
+          <h3>Add your own answer</h3>
+          <form id="q-add" class="row wrap">
+            <input id="q-new" placeholder="Question, e.g. Are you willing to work night shifts?" class="grow">
+            <input id="q-new-answer" placeholder="Answer" class="grow">
+            <button class="btn">Add</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </section>
+  <script src="/static/app.js"></script>
+</body>
+</html>
